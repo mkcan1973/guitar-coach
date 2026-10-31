@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guitar Coach</title>
+<style>
+:root {
+  --bg: #f6f3ee; --card: #ffffff; --ink: #1f1d1a; --muted: #6b655c; --line: #d9d2c6;
+  --accent: #c2621d; --accent-ink: #fff; --good: #1f9d55; --bad: #d64545; --idle: #b9b2a6;
+  --wood: #6b4423; --wood2: #7d5230; --fret: #d9d9d9; --string: #e8e1d3; --inlay: #efe6d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614; --card: #22201d; --ink: #eee9e1; --muted: #a39b8f; --line: #3a3631;
+    --accent: #e07a32; --accent-ink: #1a1208; --good: #34c472; --bad: #ef5d5d; --idle: #4a453f;
+    --wood: #4a2f18; --wood2: #57381d; --fret: #bdbdbd; --string: #d9d2c4; --inlay: #c9bda8;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; z-index: 5; }
+header h1 { font-size: 20px; margin: 0; }
+.mic { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.meter { width: 90px; height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; position: relative; }
+.meter i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--good); width: 0; }
+.meter b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
+.mic label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+nav { display: flex; gap: 4px; padding: 8px 16px 0; max-width: 1000px; margin: 0 auto; flex-wrap: wrap; }
+nav button { background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 12px; font: inherit; color: var(--muted); cursor: pointer; }
+nav button.on { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+main { max-width: 1000px; margin: 0 auto; padding: 16px; }
+button.btn { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; font: inherit; cursor: pointer; }
+button.btn:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.item { cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.item:hover { border-color: var(--accent); }
+.item h3 { margin: 0; font-size: 17px; display: flex; justify-content: space-between; gap: 8px; }
+.item p { margin: 0; color: var(--muted); font-size: 14px; }
+.badge { font-size: 12px; font-weight: 600; color: var(--good); white-space: nowrap; }
+.num { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.banner { background: color-mix(in srgb, var(--accent) 15%, var(--card)); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+.intro { color: var(--muted); margin: 0 0 12px; }
+.intro b { color: var(--ink); }
+.target { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+.light { width: 96px; height: 96px; border-radius: 50%; background: var(--idle); flex: none; transition: background .15s, box-shadow .15s; display: grid; place-items: center; font-size: 40px; color: #fff; }
+.light.good { background: var(--good); box-shadow: 0 0 30px var(--good); }
+.light.bad { background: var(--bad); box-shadow: 0 0 20px var(--bad); }
+.ttext { flex: 1; min-width: 200px; }
+.ttext .small { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ttext .big { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.ttext .note { font-size: 16px; color: var(--muted); }
+.heard { margin-top: 6px; font-size: 15px; min-height: 24px; }
+.pbtns { display: flex; flex-direction: column; gap: 6px; }
+.pbtns label { font-size: 13px; color: var(--muted); }
+.fbwrap { overflow-x: auto; margin-top: 12px; }
+svg.fb { width: 100%; height: auto; display: block; }
+.group { margin: 20px 0 8px; font-size: 18px; }
+.tabwrap { overflow-x: auto; overflow-y: hidden; position: relative; margin-bottom: 12px; padding-bottom: 4px; }
+.tab { display: flex; align-items: flex-start; font: 14px/1 ui-monospace, Consolas, monospace; width: max-content; }
+.tcol { display: grid; grid-template-rows: repeat(6, 22px); min-width: 30px; border-radius: 4px; }
+.tcol.names { min-width: 22px; color: var(--muted); }
+.tcol.cur { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.tcell { position: relative; display: grid; place-items: center; }
+.tcol:not(.names) .tcell::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
+.tcell span { position: relative; background: var(--card); padding: 0 2px; border-radius: 3px; }
+.tcol.cur .tcell span { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.tcol.tdone .tcell span { color: var(--good); font-weight: 700; }
+.tcol.tmissed .tcell span { color: var(--bad); }
+.count { color: var(--muted); font-size: 14px; margin-top: 8px; }
+.done { text-align: center; padding: 24px; }
+.done .stars { font-size: 40px; letter-spacing: 6px; }
+.tuner { text-align: center; }
+.tuner .tnote { font-size: 72px; font-weight: 800; line-height: 1; }
+.tuner .tstr { color: var(--muted); margin: 6px 0 16px; min-height: 24px; }
+.gauge { position: relative; height: 46px; max-width: 520px; margin: 0 auto; border-radius: 8px; background: linear-gradient(90deg, var(--bad) 0%, var(--line) 35%, var(--good) 46%, var(--good) 54%, var(--line) 65%, var(--bad) 100%); opacity: .9; }
+.gauge i { position: absolute; top: -6px; bottom: -6px; width: 4px; margin-left: -2px; background: var(--ink); left: 50%; border-radius: 2px; transition: left .08s; }
+.gscale { display: flex; justify-content: space-between; max-width: 520px; margin: 4px auto 0; font-size: 12px; color: var(--muted); }
+.tadvice { font-size: 20px; font-weight: 600; margin-top: 14px; min-height: 30px; }
+.strings6 { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+.strings6 button.near { border-color: var(--accent); font-weight: 700; }
+.strings6 button.ok { border-color: var(--good); color: var(--good); }
+.guide h2 { margin-top: 0; }
+.guide h3 { margin: 18px 0 4px; }
+.guide p, .guide li { color: var(--ink); }
+.guide .muted { color: var(--muted); }
+pre.tabex { font: 14px/1.35 ui-monospace, Consolas, monospace; background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto; }
+input[type=range] { width: 90px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎸 Guitar Coach</h1>
+  <div class="mic">
+    <button class="btn primary" id="micBtn">🎤 Turn on microphone</button>
+    <div class="meter" title="Mic level. The black line is the threshold: sound must pass it to be heard."><i id="meterFill"></i><b id="meterGate"></b></div>
+    <label>Sensitivity <input type="range" id="sens" min="0" max="100" value="60"></label>
+  </div>
+</header>
+<nav id="nav">
+  <button data-v="start" class="on">1. Start here</button>
+  <button data-v="tuner">2. Tuner</button>
+  <button data-v="lessons">3. Lessons</button>
+  <button data-v="songs">4. Songs</button>
+</nav>
+<main>
+
+<section id="view-start" class="card guide">
+  <h2>Welcome. No experience needed.</h2>
+  <p>This app shows you one note at a time: <b>which string</b> and <b>where to press</b>. It then listens through your microphone. When you play the right note, the light turns <b style="color:var(--good)">green</b> and you move on.</p>
+
+  <h3>The strings</h3>
+  <p>Strings are numbered <b>1 to 6</b>. <b>String 1 is the thinnest</b> (closest to the floor when you hold the guitar). <b>String 6 is the thickest</b> (closest to your face).</p>
+  <p>From thickest to thinnest their names are <b>E A D G B e</b>. A memory aid: <i>"<b>E</b>ddie <b>A</b>te <b>D</b>ynamite, <b>G</b>ood <b>B</b>ye <b>E</b>ddie"</i>.</p>
+
+  <h3>Frets</h3>
+  <p>The metal bars across the neck are <b>frets</b>. <b>"Fret 3"</b> means: press the string with a fingertip in the gap between the 2nd and 3rd bar, <b>close to the 3rd bar</b>. <b>"Fret 0"</b> (or "open") means you press nothing and just pluck the string.</p>
+  <p>Press with the very tip of your finger, firmly. A buzzing sound usually means you need to press harder or move closer to the bar.</p>
+
+  <h3>Fingers</h3>
+  <p>Your fretting-hand fingers are numbered: index = 1, middle = 2, ring = 3, pinky = 4. A good starting rule: <b>fret 1 → finger 1, fret 2 → finger 2, fret 3 → finger 3</b>.</p>
+
+  <h3>Reading tab</h3>
+  <p>Songs are written in <b>tab</b>. It has 6 lines, one for each string, and a number on a line tells you which fret to press. <b>The top line is the thinnest string</b>, which is upside-down from what you see when you look down at your guitar. Read from left to right:</p>
+<pre class="tabex">e |--0--1--3--------
+B |-----------1--3--
+G |-----------------
+D |-----------------
+A |-----------------
+E |-----------------</pre>
+  <p class="muted">That means: thinnest string open, then fret 1, then fret 3, then the 2nd string at fret 1, then fret 3.</p>
+
+  <h3>How to use the app</h3>
+  <ol>
+    <li>Click <b>Turn on microphone</b> at the top and allow access. Use a quiet room with the guitar near the computer.</li>
+    <li>Pluck a string. The level bar should jump past the black line. If it doesn't, raise <b>Sensitivity</b>. If it reacts to background noise, lower it.</li>
+    <li><b>Tune the guitar first</b> in the Tuner tab. An out-of-tune guitar will never turn the light green.</li>
+    <li>Go through the <b>Lessons</b> in order, then try the <b>Songs</b>. Click <b>🔊 Hear it</b> any time to hear how a note should sound. The mic pauses while the app plays.</li>
+  </ol>
+  <p class="muted">Sore fingertips in the first weeks are normal. 10–15 minutes every day beats one long session a week.</p>
+  <button class="btn primary" onclick="show('tuner')">Next: tune your guitar →</button>
+</section>
+
+<section id="view-tuner" class="card tuner" hidden>
+  <div id="tunerMicHint" class="banner">Turn on the microphone (top right) first.</div>
+  <div class="tnote" id="tNoteBig">–</div>
+  <div class="tstr" id="tStr">Pluck one string at a time</div>
+  <div class="gauge"><i id="needle"></i></div>
+  <div class="gscale"><span>too low</span><span>in tune</span><span>too high</span></div>
+  <div class="tadvice" id="tAdvice"></div>
+  <div class="strings6" id="tStrings"></div>
+  <p class="intro" style="margin-top:16px">Each string has a tuning peg at the head of the guitar. <b>Too low</b>: tighten the string a little (the pitch goes up). <b>Too high</b>: loosen it. Turn slowly while plucking. Click a string button to hear what it should sound like.<br>The tuner picks whichever string you're nearest to. If a string is far off, it may name the wrong one. Use the buttons to compare by ear.</p>
+</section>
+
+<section id="view-lessons" hidden>
+  <p class="intro">Work through these in order. Each one adds a few new notes.</p>
+  <div id="lessonList"></div>
+</section>
+
+<section id="view-songs" hidden>
+  <p class="intro">Play the melody one note at a time, at your own speed. Click <b>▶ Hear whole song</b> to hear how it goes first.</p>
+  <div id="songList"></div>
+</section>
+
+<section id="view-player" hidden>
+  <button class="btn" id="pBack">← Back</button>
+  <h2 id="pTitle" style="margin:12px 0 4px"></h2>
+  <div id="pIntro" class="intro"></div>
+  <div id="pMicHint" class="banner" hidden>Turn on the microphone (top right) so I can hear you.</div>
+  <div class="card">
+    <div class="tabwrap"><div class="tab" id="pTab"></div></div>
+    <div id="pPlay">
+      <div class="target">
+        <div class="light" id="light"></div>
+        <div class="ttext">
+          <div class="small">Play</div>
+          <div class="big" id="tWhere"></div>
+          <div class="note" id="tNote"></div>
+          <div class="heard" id="heard"></div>
+        </div>
+        <div class="pbtns">
+          <button class="btn" id="bHear">🔊 Hear it</button>
+          <button class="btn" id="bListen">▶ Hear whole song</button>
+          <button class="btn" id="bSkip">Skip note</button>
+          <button class="btn" id="bRestart">Restart</button>
+          <label><input type="checkbox" id="autoHear"> Play each note for me first</label>
+        </div>
+      </div>
+      <div class="fbwrap"><svg class="fb" id="fb" viewBox="0 0 915 210"></svg></div>
+      <div class="count" id="pCount"></div>
+    </div>
+    <div class="done" id="pDone" hidden></div>
+  </div>
+</section>
+</main>
+
+<script>
+// ---------- music data ----------
+const STR = { e: 1, B: 2, G: 3, D: 4, A: 5, E: 6 };
+const OPEN = { 1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40 };   // MIDI of open strings
+const SLABEL = { 1: 'e', 2: 'B', 3: 'G', 4: 'D', 5: 'A', 6: 'E' };
+const SDESC = { 1: 'thinnest', 2: '2nd thinnest', 3: '3rd', 4: '4th', 5: '5th', 6: 'thickest' };
+const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const noteName = m => NAMES[((m % 12) + 12) % 12];
+const noteFull = m => noteName(m) + (Math.floor(m / 12) - 1);
+const m2f = m => 440 * Math.pow(2, (m - 69) / 12);
+
+// "e3:2" = string e (1), fret 3, 2 beats
+function seq(str) {
+  return str.trim().split(/\s+/).map(t => {
+    const m = t.match(/^([eBGDAE])(\d+)(?::([\d.]+))?$/);
+    if (!m) throw new Error('bad token ' + t);
+    const s = STR[m[1]], f = +m[2];
+    return { s, f, midi: OPEN[s] + f, beats: m[3] ? +m[3] : 1 };
+  });
+}
+
+const LESSONS = [
+  { id: 'l1', title: 'Meet the open strings', desc: 'Pluck each string without pressing anything, thickest to thinnest.',
+    intro: 'Don\'t press any frets. Just pluck the string shown (thumb or pick, either is fine). Start with <b>string 6, the thickest</b>, and work towards the thinnest.',
+    notes: 'E0 A0 D0 G0 B0 e0 B0 G0 D0 A0 E0' },
+  { id: 'l2', title: 'Open string quiz', desc: 'Random open strings. Learn which is which.', quiz: true, rounds: 12,
+    intro: 'Random open strings. Try to find the string from the name before you look at the picture. <i>Eddie Ate Dynamite, Good Bye Eddie.</i>',
+    notes: 'E0 A0 D0 G0 B0 e0' },
+  { id: 'l3', title: 'First fretted notes: string 1', desc: 'E, F and G on the thinnest string.',
+    intro: '<b>Fret 1:</b> press with finger 1 (index) just behind the 1st metal bar. <b>Fret 3:</b> press with finger 3 (ring) just behind the 3rd bar. Press firmly with the fingertip.',
+    notes: 'e0 e1 e3 e1 e0 e1 e3 e3 e1 e0' },
+  { id: 'l4', title: 'String 2: B, C and D', desc: 'Same finger shape, one string over.',
+    intro: 'The same fingers as before, on the 2nd-thinnest string: finger 1 on fret 1, finger 3 on fret 3.',
+    notes: 'B0 B1 B3 B1 B0 B1 B3 B3 B1 B0' },
+  { id: 'l5', title: 'String 3: G and A', desc: 'Open G, and fret 2 with your middle finger.',
+    intro: 'Use <b>finger 2 (middle)</b> for fret 2. Then move between strings 3 and 2.',
+    notes: 'G0 G2 G0 G2 G0 G2 B0 G2 G0' },
+  { id: 'l6', title: 'Your first scale', desc: 'G A B C D E F G, up and down.',
+    intro: 'This climbs across strings 3, 2 and 1 using everything so far. Go slowly. Accuracy matters more than speed.',
+    notes: 'G0 G2 B0 B1 B3 e0 e1 e3 e1 e0 B3 B1 B0 G2 G0' },
+  { id: 'l7', title: 'Note quiz: top 3 strings', desc: 'Random notes from the scale.', quiz: true, rounds: 15,
+    intro: 'Random notes from your scale. Use the picture as needed. Soon you won\'t need it.',
+    notes: 'G0 G2 B0 B1 B3 e0 e1 e3' },
+  { id: 'l8', title: 'The thick strings', desc: 'E F G A B C D E F on strings 6, 5, 4.',
+    intro: 'Same fingers (1 for fret 1, 2 for fret 2, 3 for fret 3) on the thick strings. These sound low. If the mic struggles, play a bit louder.',
+    notes: 'E0 E1 E3 A0 A2 A3 D0 D2 D3 D2 D0 A3 A2 A0 E3 E1 E0' },
+];
+
+const SONGS = [
+  { id: 's1', title: 'Mary Had a Little Lamb', desc: 'Just 4 notes on strings 1–2. Start here.', bpm: 110,
+    notes: 'e0 B3 B1 B3 e0 e0 e0:2 B3 B3 B3:2 e0 e3 e3:2 e0 B3 B1 B3 e0 e0 e0 e0 B3 B3 e0 B3 B1:4' },
+  { id: 's2', title: 'Ode to Joy', desc: 'Beethoven. Strings 1–2, 5 notes.', bpm: 110,
+    notes: 'e0 e0 e1 e3 e3 e1 e0 B3 B1 B1 B3 e0 e0:1.5 B3:0.5 B3:2 e0 e0 e1 e3 e3 e1 e0 B3 B1 B1 B3 e0 B3:1.5 B1:0.5 B1:2' },
+  { id: 's3', title: 'Twinkle Twinkle Little Star', desc: 'Strings 1–3. Uses your scale.', bpm: 100,
+    notes: 'G0 G0 B3 B3 e0 e0 B3:2 B1 B1 B0 B0 G2 G2 G0:2 B3 B3 B1 B1 B0 B0 G2:2 B3 B3 B1 B1 B0 B0 G2:2 G0 G0 B3 B3 e0 e0 B3:2 B1 B1 B0 B0 G2 G2 G0:2' },
+  { id: 's4', title: 'Jingle Bells (chorus)', desc: 'Strings 1–2. Lots of repeated notes: pluck each one.', bpm: 140,
+    notes: 'e0 e0 e0:2 e0 e0 e0:2 e0 e3 B1:1.5 B3:0.5 e0:4 e1 e1 e1:1.5 e1:0.5 e1 e0 e0 e0:0.5 e0:0.5 e0 B3 B3 e0 B3:2 e3:2' },
+  { id: 's5', title: 'Happy Birthday', desc: 'Strings 1–3, the whole scale.', bpm: 100,
+    notes: 'G0:0.75 G0:0.25 G2 G0 B1 B0:2 G0:0.75 G0:0.25 G2 G0 B3 B1:2 G0:0.75 G0:0.25 e3 e0 B1 B0 G2:2 e1:0.75 e1:0.25 e0 B1 B3 B1:2' },
+  { id: 's6', title: 'Smoke on the Water', desc: 'The famous riff, all on string 3. Slide along the neck.', bpm: 112,
+    notes: 'G0 G3 G5:1.5 G0 G3 G6:0.5 G5:2 G0 G3 G5:1.5 G3 G0:3' },
+  { id: 's7', title: 'Seven Nation Army', desc: 'The stadium riff, all on string 5. Higher up the neck.', bpm: 120,
+    notes: 'A7:1.5 A7:0.5 A10:0.75 A7:0.75 A5:0.5 A3:2 A2:2' },
+  // Petra, from Songsterr community transcriptions (songsterr.com)
+  { id: 'p1', group: 'Petra', title: 'Rose Colored Stained Glass Windows: intro', desc: 'The acoustic intro melody. Strings 2–3, notes you already know (plus fret 2 on string 2).', bpm: 120,
+    notes: 'B3 B3:0.5 B2:0.5 B3:5 B3 B1 B0 G2 B0 B1:3 B1 B0 G2 G0 B0' },
+  { id: 'p2', group: 'Petra', title: 'Rose Colored Stained Glass Windows: picking', desc: 'The finger-picking pattern under the verse: bass note, then two strings above it.', bpm: 120,
+    intro: 'Each group of 8 notes is one chord picked string by string. The first note of each group is a <b>bass note</b> on a thick string (strings 4–6), then strings 3 and 2. New: <b>fret 3 on string 6</b> and <b>fret 3 on string 5</b>, both with finger 3.',
+    notes: 'E3:0.5 G0:0.5 B0:0.5 E3:0.5 G0:0.5 B0:0.5 E3:0.5 G0:0.5 D0:0.5 G2:0.5 B3:0.5 D0:0.5 G2:0.5 B3:0.5 D0:0.5 G2:0.5 E0:0.5 G0:0.5 B0:0.5 E0:0.5 G0:0.5 B0:0.5 E0:0.5 G0:0.5 A0:0.5 G0:0.5 B1:0.5 A0:0.5 G0:0.5 B1:0.5 A0:0.5 G0:0.5 A3:0.5 G0:0.5 B1:0.5 A3:0.5 G0:0.5 B1:0.5 A3:0.5 B1:0.5 E3:0.5 G0:0.5 B0:0.5 E3:0.5 G0:0.5 B0:0.5 E3:0.5 B0:0.5 D0:0.5 G2:0.5 B3:0.5 D0:0.5 G2:0.5 B3:0.5 D0:0.5 B3:0.5' },
+  { id: 'p3', group: 'Petra', title: 'Grave Robber: verse', desc: 'The sung melody of the first verse, on strings 1–3. One new note: fret 2 on string 2.', bpm: 86,
+    notes: 'B3:0.5 e0:0.5 e1:0.5 e0 B3:0.5 G2:2 e1:0.75 e0:0.75 B3:0.5 B3:1.5 e0:0.25 e1:0.25 e0:0.75 B3:0.75 B1:0.5 B1:0.75 B3:0.75 e0:0.5 e0:0.75 B3:0.75 B2:0.5 B2:1.5 B3:0.25 e0:0.25 e1:0.75 e0:0.75 B3:0.5 G2:0.75 B3:0.75 e0:0.5 e1:0.75 e0:0.75 B3:0.25 B3:1.75 e0:0.25 e1:0.25 e3:0.75 e1:0.75 e0:0.5 e0 e0:0.5 e0:0.5' },
+  { id: 'p4', group: 'Petra', title: 'Grave Robber: chorus', desc: 'The sung chorus melody. Harder: it climbs to frets 5, 7 and 8 on the thinnest string.', bpm: 86,
+    intro: 'This goes higher up the neck. For frets 5–8, slide your whole hand up rather than stretching. Fret 5 with finger 1, fret 7 with finger 3, fret 8 with finger 4 works well.',
+    notes: 'e5:0.75 e3:0.75 e1:0.5 e5:1.5 e1:0.5 e5:0.75 e3:0.75 e1:0.5 e7:2 e3:0.75 e3:0.75 e3:0.5 B5:0.75 B3:0.75 B1:0.5 e8:0.75 e7:0.75 e5:0.5 e3:1.5 B5:0.25 e3:0.25 e5 e0:0.5 B3:0.5 B3:0.25 B1:0.75 B1:0.5 B1:0.5 e8:0.75 e7:0.75 e5:0.5 e3:0.25 e5:1.75 e3:0.5 e3:0.25 e3:0.75 e3:0.5 e0:0.75 B3:0.75 B1:0.5 e8:0.75 e7:0.75 e5:0.5 B5:1.5 B5:0.25 e3:0.25 e5 B5:0.5 B3:0.5 B3:0.25 B1:1.25 B1:0.5 e8:2 e5 e3 e3 e5:3' },
+];
+for (const x of [...LESSONS, ...SONGS]) x.seq = seq(x.notes);
+
+// ---------- progress ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('gc_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('gc_' + k, JSON.stringify(v)); } catch {} },
+};
+let progress = store.get('progress', {});
+
+// ---------- navigation ----------
+let curView = 'start';
+function show(v) {
+  for (const s of document.querySelectorAll('main > section')) s.hidden = s.id !== 'view-' + v;
+  for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('on', b.dataset.v === v || (v === 'player' && b.dataset.v === (P && P.isSong ? 'songs' : 'lessons')));
+  curView = v;
+  if (v === 'lessons' || v === 'songs') renderLists();
+  window.scrollTo(0, 0);
+}
+document.getElementById('nav').onclick = e => { if (e.target.dataset.v) { P = null; show(e.target.dataset.v); } };
+
+function renderLists() {
+  const mk = (arr, el, isSong) => {
+    el.innerHTML = '';
+    let grp = null, i = 0, holder = el;
+    arr.forEach(x => {
+      if ((x.group || null) !== grp) {
+        grp = x.group || null; i = 0;
+        const hd = document.createElement('h2'); hd.className = 'group'; hd.textContent = grp || '';
+        holder = document.createElement('div'); holder.className = 'list';
+        if (grp) el.appendChild(hd);
+        el.appendChild(holder);
+      }
+      i++;
+      const pr = progress[x.id];
+      const d = document.createElement('div');
+      d.className = 'card item';
+      d.innerHTML = `<h3><span><span class="num">${i}</span>${x.title}</span>${pr ? `<span class="badge">${'★'.repeat(pr.stars)}${'☆'.repeat(3 - pr.stars)}</span>` : ''}</h3><p>${x.desc}</p>`;
+      d.onclick = () => openPlayer(x, isSong);
+      holder.appendChild(d);
+    });
+  };
+  mk(LESSONS, document.getElementById('lessonList'), false);
+  mk(SONGS, document.getElementById('songList'), true);
+}
+
+// ---------- audio ----------
+let ctx = null, analyser = null, buf = null, micOn = false;
+let muteUntil = 0;   // performance.now() ms; ignore mic while we play reference tones
+let gate = 0.01;
+
+function ensureCtx() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+const sens = document.getElementById('sens');
+sens.value = store.get('sens', 60);
+function applySens() {
+  // sensitivity 0..100 -> gate 0.05 .. 0.0015 (log)
+  gate = Math.exp(Math.log(0.05) + (Math.log(0.0015) - Math.log(0.05)) * sens.value / 100);
+  document.getElementById('meterGate').style.left = meterPos(gate) + '%';
+  store.set('sens', +sens.value);
+}
+const meterPos = r => Math.max(0, Math.min(100, (Math.log10(r) + 3.5) / 3.2 * 100));
+sens.oninput = applySens;
+applySens();
+
+document.getElementById('micBtn').onclick = async () => {
+  if (micOn) return;
+  try {
+    ensureCtx();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const src = ctx.createMediaStreamSource(stream);
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    src.connect(analyser);
+    buf = new Float32Array(analyser.fftSize);
+    micOn = true;
+    const b = document.getElementById('micBtn');
+    b.textContent = '🎤 Listening';
+    b.classList.remove('primary');
+    document.getElementById('tunerMicHint').hidden = true;
+    document.getElementById('pMicHint').hidden = true;
+    requestAnimationFrame(loop);
+  } catch (err) {
+    alert('Could not open the microphone: ' + err.message + '\n\nCheck that the browser is allowed to use the mic, and open the app with start.bat (http://localhost) rather than double-clicking the file.');
+  }
+};
+
+// Karplus-Strong plucked string
+const pluckCache = {};
+function pluckBuffer(midi) {
+  if (pluckCache[midi]) return pluckCache[midi];
+  const sr = ctx.sampleRate, f = m2f(midi), dur = 2.0;
+  const N = Math.max(2, Math.round(sr / f - 0.5));
+  const len = Math.floor(sr * dur);
+  const b = ctx.createBuffer(1, len, sr), out = b.getChannelData(0);
+  const ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+  for (let i = 1; i < N; i++) ring[i] = 0.5 * (ring[i] + ring[i - 1]);   // soften attack
+  const decay = midi < 52 ? 0.998 : 0.996;
+  let idx = 0;
+  for (let i = 0; i < len; i++) {
+    const a = ring[idx], nb = ring[(idx + 1) % N];
+    out[i] = a;
+    ring[idx] = decay * 0.5 * (a + nb);
+    idx = (idx + 1) % N;
+  }
+  return (pluckCache[midi] = b);
+}
+function playNote(midi, when = 0, dur = 1.6) {
+  ensureCtx();
+  const src = ctx.createBufferSource();
+  src.buffer = pluckBuffer(midi);
+  // Karplus-Strong delay is N + 0.5 samples; correct the integer rounding
+  const N = Math.max(2, Math.round(ctx.sampleRate / m2f(midi) - 0.5));
+  src.playbackRate.value = m2f(midi) / (ctx.sampleRate / (N + 0.5));
+  const g = ctx.createGain();
+  const t = ctx.currentTime + when;
+  g.gain.setValueAtTime(0.5, t);
+  g.gain.setTargetAtTime(0, t + dur, 0.05);
+  src.connect(g).connect(ctx.destination);
+  src.start(t);
+  src.stop(t + dur + 0.4);
+  muteUntil = Math.max(muteUntil, performance.now() + (when + dur + 0.35) * 1000);
+}
+
+// ---------- pitch detection (YIN) ----------
+function yin(x, sr) {
+  const tauMin = Math.floor(sr / 1100), tauMax = Math.min(Math.floor(sr / 72), (x.length / 2) | 0);
+  const W = x.length - tauMax;
+  const d = new Float32Array(tauMax + 1);
+  for (let tau = 1; tau <= tauMax; tau++) {
+    let s = 0;
+    for (let i = 0; i < W; i++) { const v = x[i] - x[i + tau]; s += v * v; }
+    d[tau] = s;
+  }
+  let run = 0;
+  const c = new Float32Array(tauMax + 1); c[0] = 1;
+  for (let tau = 1; tau <= tauMax; tau++) { run += d[tau]; c[tau] = run ? d[tau] * tau / run : 1; }
+  let tau = -1;
+  for (let t = tauMin; t <= tauMax; t++) {
+    if (c[t] < 0.2) { while (t + 1 <= tauMax && c[t + 1] < c[t]) t++; tau = t; break; }
+  }
+  if (tau < 0) return null;
+  let better = tau;
+  if (tau > 1 && tau < tauMax) {
+    const a = c[tau - 1], b = c[tau], cc = c[tau + 1], den = a + cc - 2 * b;
+    if (den) better = tau + (a - cc) / (2 * den);
+  }
+  return { freq: sr / better, clarity: 1 - c[tau] };
+}
+
+// ---------- main loop ----------
+const det = { stableMidi: null, stable: 0, rmsHist: [], freqHist: [] };
+function loop() {
+  requestAnimationFrame(loop);
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  const rms = Math.sqrt(sum / buf.length);
+  document.getElementById('meterFill').style.width = meterPos(rms) + '%';
+
+  const muted = performance.now() < muteUntil;
+  let p = null;
+  if (!muted && rms > gate) p = yin(buf, ctx.sampleRate);
+  let midi = null, cents = 0, freq = null;
+  if (p && p.freq > 70 && p.freq < 1100) {
+    freq = p.freq;
+    const n = 69 + 12 * Math.log2(freq / 440);
+    midi = Math.round(n);
+    cents = (n - midi) * 100;
+  }
+  det.rmsHist.push(muted ? 0 : rms);
+  if (det.rmsHist.length > 20) det.rmsHist.shift();
+  if (midi != null && midi === det.stableMidi) det.stable++;
+  else { det.stableMidi = midi; det.stable = midi == null ? 0 : 1; }
+
+  if (curView === 'tuner') tunerFrame(freq);
+  if (curView === 'player' && P && !P.done) playerFrame(rms, midi, muted);
+}
+
+// ---------- tuner ----------
+const tStrings = document.getElementById('tStrings');
+for (let s = 6; s >= 1; s--) {
+  const b = document.createElement('button');
+  b.className = 'btn'; b.dataset.s = s;
+  b.textContent = `${s}: ${SLABEL[s]}`;
+  b.onclick = () => playNote(OPEN[s], 0, 2.5);
+  tStrings.appendChild(b);
+}
+let tunerSilent = 0;
+function tunerFrame(freq) {
+  if (freq == null) {
+    if (++tunerSilent > 40) { det.freqHist = []; }
+    return;
+  }
+  tunerSilent = 0;
+  det.freqHist.push(freq);
+  if (det.freqHist.length > 7) det.freqHist.shift();
+  const f = [...det.freqHist].sort((a, b) => a - b)[det.freqHist.length >> 1];
+  const n = 69 + 12 * Math.log2(f / 440);
+  // nearest open string
+  let best = 1, bestD = 1e9;
+  for (let s = 1; s <= 6; s++) { const dd = Math.abs(n - OPEN[s]); if (dd < bestD) { bestD = dd; best = s; } }
+  const centsOff = (n - OPEN[best]) * 100;
+  document.getElementById('tNoteBig').textContent = noteName(Math.round(n));
+  document.getElementById('tStr').textContent = `Nearest: string ${best} (${SLABEL[best]}, ${SDESC[best]})`;
+  const clamp = Math.max(-50, Math.min(50, centsOff));
+  document.getElementById('needle').style.left = (50 + clamp) + '%';
+  const adv = document.getElementById('tAdvice');
+  const ok = Math.abs(centsOff) <= 6;
+  if (ok) { adv.textContent = '✅ In tune!'; adv.style.color = 'var(--good)'; }
+  else if (centsOff < 0) { adv.textContent = `Too low by ${Math.round(-centsOff)}. Tighten a little ↑`; adv.style.color = 'var(--ink)'; }
+  else { adv.textContent = `Too high by ${Math.round(centsOff)}. Loosen a little ↓`; adv.style.color = 'var(--ink)'; }
+  for (const b of tStrings.children) {
+    b.classList.toggle('near', +b.dataset.s === best);
+    b.classList.toggle('ok', +b.dataset.s === best && ok);
+  }
+}
+
+// ---------- player ----------
+let P = null;
+const $ = id => document.getElementById(id);
+
+function openPlayer(item, isSong) {
+  let notes = item.seq;
+  if (item.quiz) {
+    notes = [];
+    let last = null;
+    for (let i = 0; i < item.rounds; i++) {
+      let n;
+      do { n = item.seq[Math.floor(Math.random() * item.seq.length)]; } while (item.seq.length > 1 && n === last);
+      notes.push({ ...n, beats: 1 }); last = n;
+    }
+  }
+  P = { item, isSong, notes, idx: 0, mistakes: 0, wrongAt: new Set(), start: performance.now(), done: false,
+        armed: true, acceptedMidi: null, refractoryUntil: 0, wrongFlag: false, flashUntil: 0, msgUntil: 0 };
+  $('pTitle').textContent = item.title;
+  $('pIntro').innerHTML = item.intro || item.desc;
+  $('pMicHint').hidden = micOn;
+  $('bListen').hidden = !!item.quiz;
+  $('bListen').textContent = isSong ? '▶ Hear whole song' : '▶ Hear all notes';
+  $('pDone').hidden = true; $('pPlay').hidden = false;
+  show('player');
+  renderTab();
+  renderTarget();
+}
+
+function renderTab() {
+  const tab = $('pTab');
+  tab.innerHTML = '';
+  const names = document.createElement('div');
+  names.className = 'tcol names';
+  for (let s = 1; s <= 6; s++) names.innerHTML += `<div class="tcell">${SLABEL[s]}</div>`;
+  tab.appendChild(names);
+  P.notes.forEach((n, i) => {
+    const col = document.createElement('div');
+    col.className = 'tcol' + (i < P.idx ? (P.wrongAt.has(i) ? ' tdone tmissed' : ' tdone') : '') + (i === P.idx ? ' cur' : '');
+    const hide = P.item.quiz && i > P.idx;
+    for (let s = 1; s <= 6; s++) col.innerHTML += `<div class="tcell">${s === n.s && !hide ? `<span>${n.f}</span>` : ''}</div>`;
+    tab.appendChild(col);
+  });
+  const cur = tab.children[P.idx + 1];
+  if (cur) { const w = tab.parentElement; w.scrollLeft = cur.offsetLeft - w.offsetLeft - w.clientWidth / 2 + 15; }
+}
+
+function renderTarget() {
+  const n = P.notes[P.idx];
+  $('tWhere').textContent = `String ${n.s} · ${n.f === 0 ? 'open (fret 0)' : 'fret ' + n.f}`;
+  const finger = n.f === 0 ? 'no finger, just pluck' : n.f <= 4 ? `finger ${n.f}` : '';
+  $('tNote').textContent = `${SDESC[n.s]} string (${SLABEL[n.s]}) · note ${noteName(n.midi)}${finger ? ' · ' + finger : ''}`;
+  $('heard').textContent = micOn ? 'Listening…' : '';
+  setLight('');
+  $('pCount').textContent = `Note ${P.idx + 1} of ${P.notes.length}` + (P.mistakes ? ` · ${P.mistakes} wrong` : '');
+  drawFretboard(n);
+  if ($('autoHear').checked) playNote(n.midi, 0.15, 1.0);
+}
+
+function setLight(state, sym = '') {
+  const l = $('light');
+  l.className = 'light' + (state ? ' ' + state : '');
+  l.textContent = sym;
+}
+
+function playerFrame(rms, midi, muted) {
+  const now = performance.now();
+  if (muted) return;
+  if (P.flashUntil && now > P.flashUntil) { P.flashUntil = 0; setLight(''); }
+
+  // re-arm after a success once a new pluck / different note / silence happens
+  if (!P.armed && now > P.refractoryUntil) {
+    const h = det.rmsHist.slice(-14, -2);
+    const minR = h.length ? Math.min(...h) : 0;
+    if (rms < gate * 0.8) P.armed = true;
+    else if (rms > minR * 1.8 && rms > gate * 1.5) P.armed = true;
+    else if (midi != null && det.stable >= 3 && midi % 12 !== P.acceptedMidi % 12) P.armed = true;
+    if (P.armed) { det.stable = 0; P.wrongFlag = false; }
+  }
+
+  if (midi != null && det.stable >= 3 && now > P.msgUntil) {
+    $('heard').innerHTML = `Hearing: <b>${noteName(midi)}</b>`;
+  }
+  if (!P.armed || midi == null) return;
+
+  const target = P.notes[P.idx].midi;
+  if (det.stable >= 5 && (midi === target || Math.abs(midi - target) === 12)) {
+    success(midi, midi !== target);
+  } else if (det.stable >= 14 && midi !== target && Math.abs(midi - target) !== 12 && !P.wrongFlag) {
+    P.wrongFlag = true;
+    P.mistakes++;
+    P.wrongAt.add(P.idx);
+    setLight('bad', '✗');
+    P.flashUntil = now + 700;
+    P.msgUntil = now + 2500;
+    const hint = midi < target ? 'too low' : 'too high';
+    $('heard').innerHTML = `Heard <b>${noteName(midi)}</b>, which is ${hint}. Check the string and fret, then pluck again.`;
+    $('pCount').textContent = `Note ${P.idx + 1} of ${P.notes.length} · ${P.mistakes} wrong`;
+  }
+  if (P.wrongFlag && det.stable === 1) P.wrongFlag = false;   // note changed: allow new feedback
+}
+
+function success(midi, octaveOff) {
+  P.armed = false;
+  P.acceptedMidi = midi;
+  P.refractoryUntil = performance.now() + 220;
+  P.idx++;
+  if (P.idx >= P.notes.length) return finish();
+  renderTab();
+  renderTarget();
+  setLight('good', '✓');
+  P.flashUntil = performance.now() + 450;
+  P.msgUntil = performance.now() + 1200;
+  $('heard').textContent = octaveOff ? '✓ Right note (the mic heard it an octave off; that\'s fine)' : '✓ Nice!';
+}
+
+function finish() {
+  P.done = true;
+  renderTab();
+  const n = P.notes.length;
+  const acc = n / (n + P.mistakes);
+  const stars = acc >= 0.95 ? 3 : acc >= 0.8 ? 2 : 1;
+  const secs = Math.round((performance.now() - P.start) / 1000);
+  const prev = progress[P.item.id];
+  if (!prev || stars > prev.stars) progress[P.item.id] = { stars };
+  store.set('progress', progress);
+  const list = P.isSong ? SONGS : LESSONS;
+  const next = list[list.indexOf(P.item) + 1];
+  $('pPlay').hidden = true;
+  const d = $('pDone');
+  d.hidden = false;
+  d.innerHTML = `<div class="stars" style="color:var(--accent)">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+    <h2>${stars === 3 ? 'Excellent!' : stars === 2 ? 'Well done!' : 'Finished! Practice makes perfect.'}</h2>
+    <p>${n} notes · ${P.mistakes} wrong · ${secs} seconds</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn" id="dAgain">Play again</button>
+      ${P.isSong ? '<button class="btn" id="dListen">▶ Hear it played</button>' : ''}
+      ${next ? `<button class="btn primary" id="dNext">Next: ${next.title} →</button>` :
+        (!P.isSong ? '<button class="btn primary" id="dSongs">On to the songs →</button>' : '')}
+    </div>`;
+  setLight('good', '✓');
+  $('dAgain').onclick = () => openPlayer(P.item, P.isSong);
+  if ($('dListen')) $('dListen').onclick = () => playAll(P.item);
+  if ($('dNext')) $('dNext').onclick = () => openPlayer(next, P.isSong);
+  if ($('dSongs')) $('dSongs').onclick = () => { P = null; show('songs'); };
+}
+
+function playAll(item) {
+  const spb = 60 / (item.bpm || 90);
+  let t = 0.1;
+  for (const n of item.seq) { playNote(n.midi, t, Math.max(0.3, n.beats * spb * 0.95)); t += n.beats * spb; }
+}
+
+$('pBack').onclick = () => { const v = P && P.isSong ? 'songs' : 'lessons'; P = null; show(v); };
+$('bHear').onclick = () => P && !P.done && playNote(P.notes[P.idx].midi, 0, 1.5);
+$('bListen').onclick = () => P && playAll(P.item);
+$('bSkip').onclick = () => { if (P && !P.done) { P.wrongAt.add(P.idx); P.mistakes++; P.armed = true; P.idx++; if (P.idx >= P.notes.length) finish(); else { renderTab(); renderTarget(); } } };
+$('bRestart').onclick = () => P && openPlayer(P.item, P.isSong);
+$('autoHear').checked = store.get('autoHear', false);
+$('autoHear').onchange = e => store.set('autoHear', e.target.checked);
+
+// ---------- fretboard drawing ----------
+const NUT = 80;
+let FRETS = 12, SCALE = 1640;
+const fx = n => NUT + SCALE * (1 - Math.pow(2, -n / 12));
+const sy = s => 22 + (s - 1) * 30;
+function drawFretboard(target) {
+  const svg = $('fb');
+  FRETS = Math.min(12, Math.max(5, ...P.item.seq.map(n => n.f + 1)));
+  const len = Math.min(820, 70 + 80 * FRETS);   // short board when few frets are needed (reads better on phones)
+  SCALE = len / (1 - Math.pow(2, -FRETS / 12));
+  svg.setAttribute('viewBox', `0 0 ${NUT + len + 15} 210`);
+  let h = '';
+  h += `<rect x="${NUT}" y="8" width="${fx(FRETS) - NUT + 4}" height="178" rx="4" fill="var(--wood)"/>`;
+  for (const f of [3, 5, 7, 9]) if (f <= FRETS) h += `<circle cx="${(fx(f - 1) + fx(f)) / 2}" cy="97" r="8" fill="var(--inlay)" opacity=".7"/>`;
+  if (FRETS >= 12) h += `<circle cx="${(fx(11) + fx(12)) / 2}" cy="67" r="8" fill="var(--inlay)" opacity=".7"/><circle cx="${(fx(11) + fx(12)) / 2}" cy="127" r="8" fill="var(--inlay)" opacity=".7"/>`;
+  h += `<rect x="${NUT - 6}" y="8" width="8" height="178" fill="var(--inlay)"/>`;
+  for (let f = 1; f <= FRETS; f++) {
+    h += `<rect x="${fx(f) - 1.5}" y="8" width="3" height="178" fill="var(--fret)"/>`;
+    h += `<text x="${(fx(f - 1) + fx(f)) / 2}" y="204" text-anchor="middle" font-size="13" fill="var(--muted)">${f}</text>`;
+  }
+  for (let s = 1; s <= 6; s++) {
+    h += `<line x1="${NUT - 6}" x2="${fx(FRETS) + 4}" y1="${sy(s)}" y2="${sy(s)}" stroke="var(--string)" stroke-width="${0.8 + (s - 1) * 0.55}"/>`;
+    h += `<text x="36" y="${sy(s) + 5}" text-anchor="end" font-size="14" fill="var(--muted)" font-weight="${target && target.s === s ? 700 : 400}">${s} ${SLABEL[s]}</text>`;
+  }
+  // faint dots for every note in this lesson/song
+  const seen = new Set();
+  for (const n of P.item.seq) {
+    const k = n.s + ':' + n.f;
+    if (seen.has(k) || (target && n.s === target.s && n.f === target.f)) continue;
+    seen.add(k);
+    const x = n.f === 0 ? 58 : (fx(n.f - 1) + fx(n.f)) / 2 + 6;
+    h += `<circle cx="${x}" cy="${sy(n.s)}" r="7" fill="none" stroke="var(--muted)" stroke-width="1.5" opacity=".6"/>`;
+  }
+  if (target) {
+    const x = target.f === 0 ? 58 : (fx(target.f - 1) + fx(target.f)) / 2 + 6;
+    if (target.f === 0) h += `<circle cx="${x}" cy="${sy(target.s)}" r="12" fill="var(--card)" stroke="var(--accent)" stroke-width="4"/>`;
+    else h += `<circle cx="${x}" cy="${sy(target.s)}" r="13" fill="var(--accent)"/><text x="${x}" y="${sy(target.s) + 5}" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-ink)">${target.f <= 4 ? target.f : ''}</text>`;
+  }
+  svg.innerHTML = h;
+}
+</script>
+</body>
+</html>
