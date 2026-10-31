@@ -66,6 +66,8 @@ svg.fb { width: 100%; height: auto; display: block; }
 .tcell { position: relative; display: grid; place-items: center; }
 .tcol:not(.names) .tcell::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
 .tcell span { position: relative; background: var(--card); padding: 0 2px; border-radius: 3px; }
+.tcol.play { background: color-mix(in srgb, var(--good) 30%, transparent); }
+.tcol.play .tcell span { background: var(--good); color: #fff; font-weight: 700; }
 .tcol.cur .tcell span { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 .tcol.tdone .tcell span { color: var(--good); font-weight: 700; }
 .tcol.tmissed .tcell span { color: var(--bad); }
@@ -188,10 +190,10 @@ E |-----------------</pre>
           <label><input type="checkbox" id="autoHear"> Play each note for me first</label>
         </div>
       </div>
-      <div class="fbwrap"><svg class="fb" id="fb" viewBox="0 0 915 210"></svg></div>
-      <div class="count" id="pCount"></div>
     </div>
     <div class="done" id="pDone" hidden></div>
+    <div class="fbwrap"><svg class="fb" id="fb" viewBox="0 0 915 210"></svg></div>
+    <div class="count" id="pCount"></div>
   </div>
 </section>
 </main>
@@ -289,7 +291,7 @@ function show(v) {
   if (v === 'lessons' || v === 'songs') renderLists();
   window.scrollTo(0, 0);
 }
-document.getElementById('nav').onclick = e => { if (e.target.dataset.v) { P = null; show(e.target.dataset.v); } };
+document.getElementById('nav').onclick = e => { if (e.target.dataset.v) { stopPlayback(); P = null; show(e.target.dataset.v); } };
 
 function renderLists() {
   const mk = (arr, el, isSong) => {
@@ -397,6 +399,7 @@ function playNote(midi, when = 0, dur = 1.6) {
   src.start(t);
   src.stop(t + dur + 0.4);
   muteUntil = Math.max(muteUntil, performance.now() + (when + dur + 0.35) * 1000);
+  return src;
 }
 
 // ---------- pitch detection (YIN) ----------
@@ -498,6 +501,7 @@ let P = null;
 const $ = id => document.getElementById(id);
 
 function openPlayer(item, isSong) {
+  stopPlayback();
   let notes = item.seq;
   if (item.quiz) {
     notes = [];
@@ -535,8 +539,12 @@ function renderTab() {
     for (let s = 1; s <= 6; s++) col.innerHTML += `<div class="tcell">${s === n.s && !hide ? `<span>${n.f}</span>` : ''}</div>`;
     tab.appendChild(col);
   });
-  const cur = tab.children[P.idx + 1];
-  if (cur) { const w = tab.parentElement; w.scrollLeft = cur.offsetLeft - w.offsetLeft - w.clientWidth / 2 + 15; }
+  scrollTabTo(P.idx);
+}
+
+function scrollTabTo(i) {
+  const tab = $('pTab'), col = tab.children[i + 1];
+  if (col) { const w = tab.parentElement; w.scrollLeft = col.offsetLeft - w.offsetLeft - w.clientWidth / 2 + 15; }
 }
 
 function renderTarget() {
@@ -621,6 +629,8 @@ function finish() {
   const list = P.isSong ? SONGS : LESSONS;
   const next = list[list.indexOf(P.item) + 1];
   $('pPlay').hidden = true;
+  $('pCount').textContent = '';
+  drawFretboard(null);
   const d = $('pDone');
   d.hidden = false;
   d.innerHTML = `<div class="stars" style="color:var(--accent)">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
@@ -639,13 +649,50 @@ function finish() {
   if ($('dSongs')) $('dSongs').onclick = () => { P = null; show('songs'); };
 }
 
+// Play the whole piece, highlighting each note on the tab and fretboard as it sounds.
+let playback = null;
 function playAll(item) {
+  if (playback) return stopPlayback();
+  ensureCtx();
   const spb = 60 / (item.bpm || 90);
+  const timers = [], srcs = [];
   let t = 0.1;
-  for (const n of item.seq) { playNote(n.midi, t, Math.max(0.3, n.beats * spb * 0.95)); t += n.beats * spb; }
+  item.seq.forEach((n, i) => {
+    srcs.push(playNote(n.midi, t, Math.max(0.3, n.beats * spb * 0.95)));
+    timers.push(setTimeout(() => showPlaying(i), t * 1000));
+    t += n.beats * spb;
+  });
+  timers.push(setTimeout(stopPlayback, t * 1000 + 400));
+  playback = { timers, srcs };
+  listenLabels();
+}
+function showPlaying(i) {
+  const cols = $('pTab').children;
+  for (const c of cols) c.classList.remove('play');
+  if (cols[i + 1]) cols[i + 1].classList.add('play');
+  scrollTabTo(i);
+  drawFretboard(P.item.seq[i]);
+  $('pCount').textContent = `Playing note ${i + 1} of ${P.item.seq.length}`;
+}
+function stopPlayback() {
+  if (!playback) return;
+  playback.timers.forEach(clearTimeout);
+  for (const src of playback.srcs) { try { src.stop(); } catch {} }
+  playback = null;
+  muteUntil = performance.now() + 300;
+  for (const c of $('pTab').children) c.classList.remove('play');
+  listenLabels();
+  if (!P) return;
+  if (P.done) { drawFretboard(null); $('pCount').textContent = ''; }
+  else { scrollTabTo(P.idx); drawFretboard(P.notes[P.idx]); $('pCount').textContent = `Note ${P.idx + 1} of ${P.notes.length}` + (P.mistakes ? ` · ${P.mistakes} wrong` : ''); }
+}
+function listenLabels() {
+  const b = $('bListen');
+  b.textContent = playback ? '■ Stop' : P && P.isSong ? '▶ Hear whole song' : '▶ Hear all notes';
+  if ($('dListen')) $('dListen').textContent = playback ? '■ Stop' : '▶ Hear it played';
 }
 
-$('pBack').onclick = () => { const v = P && P.isSong ? 'songs' : 'lessons'; P = null; show(v); };
+$('pBack').onclick = () => { stopPlayback(); const v = P && P.isSong ? 'songs' : 'lessons'; P = null; show(v); };
 $('bHear').onclick = () => P && !P.done && playNote(P.notes[P.idx].midi, 0, 1.5);
 $('bListen').onclick = () => P && playAll(P.item);
 $('bSkip').onclick = () => { if (P && !P.done) { P.wrongAt.add(P.idx); P.mistakes++; P.armed = true; P.idx++; if (P.idx >= P.notes.length) finish(); else { renderTab(); renderTarget(); } } };
