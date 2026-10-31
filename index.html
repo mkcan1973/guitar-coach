@@ -75,6 +75,9 @@ svg.fb { width: 100%; height: auto; display: block; }
 .done { text-align: center; padding: 24px; }
 .done .stars { font-size: 40px; letter-spacing: 6px; }
 .tuner { text-align: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+.seg button { background: var(--card); color: var(--muted); border: none; padding: 8px 18px; font: inherit; cursor: pointer; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .tuner .tnote { font-size: 72px; font-weight: 800; line-height: 1; }
 .tuner .tstr { color: var(--muted); margin: 6px 0 16px; min-height: 24px; }
 .gauge { position: relative; height: 46px; max-width: 520px; margin: 0 auto; border-radius: 8px; background: linear-gradient(90deg, var(--bad) 0%, var(--line) 35%, var(--good) 46%, var(--good) 54%, var(--line) 65%, var(--bad) 100%); opacity: .9; }
@@ -147,13 +150,15 @@ E |-----------------</pre>
 
 <section id="view-tuner" class="card tuner" hidden>
   <div id="tunerMicHint" class="banner">Turn on the microphone (top right) first.</div>
+  <div class="seg" id="instSeg"><button data-i="guitar">🎸 Guitar</button><button data-i="mandolin">Mandolin</button></div>
   <div class="tnote" id="tNoteBig">–</div>
   <div class="tstr" id="tStr">Pluck one string at a time</div>
   <div class="gauge"><i id="needle"></i></div>
   <div class="gscale"><span>too low</span><span>in tune</span><span>too high</span></div>
   <div class="tadvice" id="tAdvice"></div>
   <div class="strings6" id="tStrings"></div>
-  <p class="intro" style="margin-top:16px">Each string has a tuning peg at the head of the guitar. <b>Too low</b>: tighten the string a little (the pitch goes up). <b>Too high</b>: loosen it. Turn slowly while plucking. Click a string button to hear what it should sound like.<br>The tuner picks whichever string you're nearest to. If a string is far off, it may name the wrong one. Use the buttons to compare by ear.</p>
+  <p class="intro" id="tHelp" style="margin-top:16px"></p>
+  <p class="intro">Each string has a tuning peg at the head of the instrument. <b>Too low</b>: tighten the string a little (the pitch goes up). <b>Too high</b>: loosen it. Turn slowly while plucking. Click a string button to hear what it should sound like.<br>The tuner picks whichever string you're nearest to. If a string is far off, it may name the wrong one. Use the buttons to compare by ear.</p>
 </section>
 
 <section id="view-lessons" hidden>
@@ -199,6 +204,8 @@ E |-----------------</pre>
 </main>
 
 <script>
+const $ = id => document.getElementById(id);
+
 // ---------- music data ----------
 const STR = { e: 1, B: 2, G: 3, D: 4, A: 5, E: 6 };
 const OPEN = { 1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40 };   // MIDI of open strings
@@ -484,14 +491,36 @@ function loop() {
 }
 
 // ---------- tuner ----------
+// strings listed thickest/lowest first; n = string number (1 = thinnest)
+const INSTRUMENTS = {
+  guitar: { word: 'string', strings: [6, 5, 4, 3, 2, 1].map(s => ({ n: s, label: SLABEL[s], midi: OPEN[s], desc: SDESC[s] })),
+    help: 'Standard tuning, thickest to thinnest: <b>E A D G B E</b>.' },
+  mandolin: { word: 'pair', strings: [
+      { n: 4, label: 'G', midi: 55, desc: 'thickest' }, { n: 3, label: 'D', midi: 62, desc: '3rd' },
+      { n: 2, label: 'A', midi: 69, desc: '2nd' }, { n: 1, label: 'E', midi: 76, desc: 'thinnest' }],
+    help: 'Mandolin tuning, thickest to thinnest: <b>G D A E</b>. A mandolin has 8 strings in <b>4 pairs</b>, and both strings in a pair are tuned to the same note. Pluck and tune <b>one string at a time</b>, then pluck the pair together. It should sound like one clean note, with no wobble.' },
+};
+let inst = store.get('instrument', 'guitar');
+if (!INSTRUMENTS[inst]) inst = 'guitar';
 const tStrings = document.getElementById('tStrings');
-for (let s = 6; s >= 1; s--) {
-  const b = document.createElement('button');
-  b.className = 'btn'; b.dataset.s = s;
-  b.textContent = `${s}: ${SLABEL[s]}`;
-  b.onclick = () => playNote(OPEN[s], 0, 2.5);
-  tStrings.appendChild(b);
+function setInstrument(i) {
+  inst = i; store.set('instrument', i);
+  for (const b of $('instSeg').children) b.classList.toggle('on', b.dataset.i === i);
+  const I = INSTRUMENTS[i];
+  $('tHelp').innerHTML = I.help;
+  tStrings.innerHTML = '';
+  for (const st of I.strings) {
+    const b = document.createElement('button');
+    b.className = 'btn'; b.dataset.s = st.n;
+    b.textContent = `${st.n}: ${st.label}`;
+    b.onclick = () => playNote(st.midi, 0, 2.5);
+    tStrings.appendChild(b);
+  }
+  det.freqHist = [];
+  $('tNoteBig').textContent = '–'; $('tStr').textContent = 'Pluck one string at a time';
+  $('tAdvice').textContent = ''; $('needle').style.left = '50%';
 }
+$('instSeg').onclick = e => { if (e.target.dataset.i) setInstrument(e.target.dataset.i); };
 let tunerSilent = 0;
 function tunerFrame(freq) {
   if (freq == null) {
@@ -504,11 +533,13 @@ function tunerFrame(freq) {
   const f = [...det.freqHist].sort((a, b) => a - b)[det.freqHist.length >> 1];
   const n = 69 + 12 * Math.log2(f / 440);
   // nearest open string
-  let best = 1, bestD = 1e9;
-  for (let s = 1; s <= 6; s++) { const dd = Math.abs(n - OPEN[s]); if (dd < bestD) { bestD = dd; best = s; } }
-  const centsOff = (n - OPEN[best]) * 100;
+  const I = INSTRUMENTS[inst];
+  let bestS = I.strings[0], bestD = 1e9;
+  for (const st of I.strings) { const dd = Math.abs(n - st.midi); if (dd < bestD) { bestD = dd; bestS = st; } }
+  const best = bestS.n;
+  const centsOff = (n - bestS.midi) * 100;
   document.getElementById('tNoteBig').textContent = noteName(Math.round(n));
-  document.getElementById('tStr').textContent = `Nearest: string ${best} (${SLABEL[best]}, ${SDESC[best]})`;
+  document.getElementById('tStr').textContent = `Nearest: ${I.word} ${best} (${bestS.label}, ${bestS.desc})`;
   const clamp = Math.max(-50, Math.min(50, centsOff));
   document.getElementById('needle').style.left = (50 + clamp) + '%';
   const adv = document.getElementById('tAdvice');
@@ -524,7 +555,6 @@ function tunerFrame(freq) {
 
 // ---------- player ----------
 let P = null;
-const $ = id => document.getElementById(id);
 
 function openPlayer(item, isSong) {
   stopPlayback();
@@ -725,6 +755,7 @@ $('bSkip').onclick = () => { if (P && !P.done) { P.wrongAt.add(P.idx); P.mistake
 $('bRestart').onclick = () => P && openPlayer(P.item, P.isSong);
 $('autoHear').checked = store.get('autoHear', false);
 $('autoHear').onchange = e => store.set('autoHear', e.target.checked);
+setInstrument(inst);
 
 // ---------- fretboard drawing ----------
 const NUT = 80;
